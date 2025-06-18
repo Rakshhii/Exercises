@@ -28,7 +28,7 @@ jobs:
           cx_client_id: ${{ secrets.OAUTH_CLIENT }}
           cx_client_secret: ${{ secrets.OAUTH_SECRET }}
           cx_tenant: 'aslesha-sedemo'
-          cx_base_uri: 'https://eu-2.ast.checkmarx.net/'
+          base_uri: https://eu-2.ast.checkmarx.net
           additional_params: --report-format sarif --output-path .
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v2
