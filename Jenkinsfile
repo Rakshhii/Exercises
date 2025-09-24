@@ -4,6 +4,7 @@ pipeline {
     environment {
         CX_TENANT = 'cx_ind_internal_test'
         CX_BASE_URI = 'https://ind.ast.checkmarx.net'
+        CX_CLI_PATH = 'C:\\Rakshii\\cx-cli\\cx'  // Path to cx.exe
     }
 
     stages {
@@ -12,9 +13,9 @@ pipeline {
                 withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
                     bat """
                         echo Configuring CxOne CLI...
-                        C:\\Rakshii\\cx-cli\\cx configure set base-uri %CX_BASE_URI%
-                        C:\\Rakshii\\cx-cli\\cx configure set tenant %CX_TENANT%
-                        C:\\Rakshii\\cx-cli\\cx configure set api-key %CX_APIKEY%
+                        %CX_CLI_PATH% configure set --prop-name cx_base_uri --prop-value %CX_BASE_URI%
+                        %CX_CLI_PATH% configure set --prop-name cx_tenant --prop-value %CX_TENANT%
+                        %CX_CLI_PATH% configure set --prop-name cx_api_key --prop-value %CX_APIKEY%
                     """
                 }
             }
@@ -24,7 +25,7 @@ pipeline {
             steps {
                 bat """
                     echo Running container security scan...
-                    C:\\Rakshii\\cx-cli\\cx scan create ^
+                    %CX_CLI_PATH% scan create ^
                         --project-name "Rakshhii/Exercises" ^
                         --branch "1.1" ^
                         -s .
@@ -35,7 +36,7 @@ pipeline {
         stage('Check Results / Quality Gate') {
             steps {
                 script {
-                    def result = bat(script: 'C:\\Rakshii\\cx-cli\\cx results show --last --format json', returnStdout: true).trim()
+                    def result = bat(script: '%CX_CLI_PATH% results show --last --format json', returnStdout: true).trim()
                     echo "Scan Results: ${result}"
 
                     if (result.contains('"HIGH"')) {
