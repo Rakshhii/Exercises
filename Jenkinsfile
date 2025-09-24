@@ -15,7 +15,7 @@ pipeline {
                         echo Configuring CxOne CLI...
                         %CX_CLI_PATH% configure set --prop-name cx_base_uri --prop-value %CX_BASE_URI%
                         %CX_CLI_PATH% configure set --prop-name cx_tenant --prop-value %CX_TENANT%
-                        %CX_CLI_PATH% configure set --prop-name cx_api_key --prop-value %CX_APIKEY%
+                        echo API key will be passed via environment variable.
                     """
                 }
             }
@@ -23,26 +23,35 @@ pipeline {
 
         stage('Run CxOne Container Security Scan') {
             steps {
-                bat """
-                    echo Running container security scan...
-                    %CX_CLI_PATH% scan create ^
-                        --project-name "Rakshhii/Exercises" ^
-                        --branch "1.1" ^
-                        -s .
-                """
+                withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
+                    bat """
+                        echo Running container security scan...
+                        set CX_APIKEY=%CX_APIKEY%
+                        %CX_CLI_PATH% scan create ^
+                            --project-name "Rakshhii/Exercises" ^
+                            --branch "1.1" ^
+                            -s .
+                    """
+                }
             }
         }
 
         stage('Check Results / Quality Gate') {
             steps {
-                script {
-                    def result = bat(script: '%CX_CLI_PATH% results show --last --format json', returnStdout: true).trim()
-                    echo "Scan Results: ${result}"
+                withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
+                    script {
+                        def result = bat(script: """
+                            set CX_APIKEY=%CX_APIKEY%
+                            %CX_CLI_PATH% results show --last --format json
+                        """, returnStdout: true).trim()
 
-                    if (result.contains('"HIGH"')) {
-                        error("❌ High severity vulnerabilities found! Failing the pipeline.")
-                    } else {
-                        echo "✅ No high severity vulnerabilities detected. Pipeline passes."
+                        echo "Scan Results: ${result}"
+
+                        if (result.contains('"HIGH"')) {
+                            error("❌ High severity vulnerabilities found! Failing the pipeline.")
+                        } else {
+                            echo "✅ No high severity vulnerabilities detected. Pipeline passes."
+                        }
                     }
                 }
             }
