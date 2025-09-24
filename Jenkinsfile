@@ -12,9 +12,9 @@ pipeline {
                 withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
                     bat """
                         echo Configuring CxOne CLI...
-                        cx configure set base-uri %CX_BASE_URI%
-                        cx configure set tenant %CX_TENANT%
-                        cx configure set api-key %CX_APIKEY%
+                        C:\Rakshii\cx-cli\cx configure set base-uri %CX_BASE_URI%
+                        C:\Rakshii\cx-cli\cx configure set tenant %CX_TENANT%
+                        C:\Rakshii\cx-cli\cx configure set api-key %CX_APIKEY%
                     """
                 }
             }
@@ -24,7 +24,7 @@ pipeline {
             steps {
                 bat """
                     echo Running container security scan...
-                    cx scan create ^
+                    C:\Rakshii\cx-cli\cx scan create ^
                         --project-name "Rakshhii/Exercises" ^
                         --branch "1.1" ^
                         -s .
@@ -35,7 +35,7 @@ pipeline {
         stage('Check Results / Quality Gate') {
             steps {
                 script {
-                    def result = bat(script: 'cx results show --last --format json', returnStdout: true).trim()
+                    def result = bat(script: 'C:\Rakshii\cx-cli\cx results show --last --format json', returnStdout: true).trim()
                     echo "Scan Results: ${result}"
 
                     if (result.contains('"HIGH"')) {
