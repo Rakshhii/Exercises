@@ -2,16 +2,19 @@ pipeline {
     agent any
 
     environment {
-        CX_APIKEY = credentials('cx-api-key')  // Your Jenkins credential ID for API key
-        CX_CLI_PATH = 'C:\\Rakshii\\cx-cli\\cx.exe'  // Path to your Checkmarx CLI executable
+        CX_CLI_PATH = "C:\\Rakshii\\cx-cli\\cx.exe"
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
-                checkout([$class: 'GitSCM', 
-                    branches: [[name: '*/1.1']], 
-                    userRemoteConfigs: [[url: 'https://github.com/Rakshhii/Exercises', credentialsId: 'rakshi']]
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/1.1']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/Rakshhii/Exercises',
+                        credentialsId: 'rakshi'
+                    ]]
                 ])
             }
         }
@@ -33,30 +36,24 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
                     script {
-                        echo 'Running container security scan...'
-
-                        // Run scan and capture output
+                        echo "Running container security scan..."
                         def scanOutput = bat(
                             script: """
                                 set CX_APIKEY=%CX_APIKEY%
-                                ${env.CX_CLI_PATH} scan create ^
-                                    --project-name "Rakshhii/Exercises" ^
-                                    --branch "1.1" ^
-                                    -s .
+                                ${env.CX_CLI_PATH} scan create --project-name "Rakshhii/Exercises" --branch "1.1" -s .
                             """,
                             returnStdout: true
                         ).trim()
-
                         echo "Scan Output:\n${scanOutput}"
 
-                        // Extract Scan ID from output for later stages
-                        def scanIdMatch = scanOutput =~ /Scan ID\s*:\s*([a-f0-9-]+)/
-                        if (!scanIdMatch) {
-                            error("❌ Failed to extract Scan ID from scan output!")
+                        // Extract Scan ID from output using regex
+                        def scanIdMatcher = scanOutput =~ /Scan ID\s*:\s*([a-f0-9\\-]+)/
+                        if (scanIdMatcher) {
+                            env.SCAN_ID = scanIdMatcher[0][1]
+                            echo "Extracted Scan ID: ${env.SCAN_ID}"
+                        } else {
+                            error("Failed to extract Scan ID from scan output.")
                         }
-
-                        env.SCAN_ID = scanIdMatch[0][1]
-                        echo "Extracted Scan ID: ${env.SCAN_ID}"
                     }
                 }
             }
@@ -68,18 +65,18 @@ pipeline {
                     script {
                         echo "Fetching results for Scan ID: ${env.SCAN_ID}"
 
-                        def resultJson = bat(
+                        def resultOutput = bat(
                             script: """
                                 set CX_APIKEY=%CX_APIKEY%
-                                ${env.CX_CLI_PATH} results show --scan-id ${env.SCAN_ID} --format json
+                                ${env.CX_CLI_PATH} results show --scan-id ${env.SCAN_ID}
                             """,
                             returnStdout: true
                         ).trim()
 
-                        echo "Scan Results JSON:\n${resultJson}"
+                        echo "Scan Results Output:\n${resultOutput}"
 
-                        // Simple check for HIGH or CRITICAL vulnerabilities
-                        if (resultJson.contains('"HIGH"') || resultJson.contains('"CRITICAL"')) {
+                        // Check for Critical or High vulnerabilities using regex
+                        if (resultOutput =~ /Critical\s*:\s*[1-9]\d*/ || resultOutput =~ /High\s*:\s*[1-9]\d*/) {
                             error("❌ High or Critical severity vulnerabilities found! Failing the pipeline.")
                         } else {
                             echo "✅ No high or critical severity vulnerabilities detected."
@@ -92,14 +89,11 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline finished. Cleaning up workspace...'
+            echo "Pipeline finished. Cleaning up workspace..."
             cleanWs()
         }
         failure {
-            echo 'Build failed!'
-        }
-        success {
-            echo 'Build succeeded!'
+            echo "Build failed!"
         }
     }
 }
