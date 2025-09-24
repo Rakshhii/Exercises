@@ -35,7 +35,7 @@ pipeline {
         stage('Check Results / Quality Gate') {
             steps {
                 script {
-                    def result = bat(script: 'C:\Rakshii\cx-cli\cx results show --last --format json', returnStdout: true).trim()
+                    def result = bat(script: 'C:\\Rakshii\\cx-cli\\cx results show --last --format json', returnStdout: true).trim()
                     echo "Scan Results: ${result}"
 
                     if (result.contains('"HIGH"')) {
