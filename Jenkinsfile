@@ -32,21 +32,26 @@ pipeline {
             }
         }
 
-        stage('Run CxOne Container Security Scan') {
+        stage('Run SAST + SCA + Container Security Scans') {
             steps {
                 withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
                     script {
-                        echo "Running container security scan..."
+                        echo "Running SAST + SCA + Container Security scans..."
                         def scanOutput = bat(
                             script: """
                                 set CX_APIKEY=%CX_APIKEY%
-                                ${env.CX_CLI_PATH} scan create --project-name "Rakshhii/Exercises" --branch "1.1" -s .
+                                ${env.CX_CLI_PATH} scan create ^
+                                    --project-name "Rakshhii/Exercises" ^
+                                    --branch "1.1" ^
+                                    -s . ^
+                                    --scan-types sast,sca,container-security ^
+                                    --container-images goat:ex1
                             """,
                             returnStdout: true
                         ).trim()
                         echo "Scan Output:\n${scanOutput}"
 
-                        // Extract Scan ID from output using regex
+                        // Extract Scan ID from output
                         def scanIdMatcher = scanOutput =~ /Scan ID\s*:\s*([a-f0-9\\-]+)/
                         if (scanIdMatcher) {
                             env.SCAN_ID = scanIdMatcher[0][1]
@@ -75,7 +80,7 @@ pipeline {
 
                         echo "Scan Results Output:\n${resultOutput}"
 
-                        // Check for Critical or High vulnerabilities using regex
+                        // Check for Critical or High vulnerabilities
                         if (resultOutput =~ /Critical\s*:\s*[1-9]\d*/ || resultOutput =~ /High\s*:\s*[1-9]\d*/) {
                             error("❌ High or Critical severity vulnerabilities found! Failing the pipeline.")
                         } else {
