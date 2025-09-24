@@ -1,67 +1,46 @@
-pipeline {
-    agent any
-
-    environment {
-        CX_TENANT = 'cx_ind_internal_test'
-        CX_BASE_URI = 'https://ind.ast.checkmarx.net'
-        CX_CLI_PATH = 'C:\\Rakshii\\cx-cli\\cx'  // Path to cx.exe
-    }
-
-    stages {
-        stage('Configure CxOne CLI') {
-            steps {
-                withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
-                    bat """
-                        echo Configuring CxOne CLI...
-                        %CX_CLI_PATH% configure set --prop-name cx_base_uri --prop-value %CX_BASE_URI%
-                        %CX_CLI_PATH% configure set --prop-name cx_tenant --prop-value %CX_TENANT%
-                        echo API key will be passed via environment variable.
-                    """
-                }
-            }
-        }
-
-        stage('Run CxOne Container Security Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
-                    bat """
-                        echo Running container security scan...
+stage('Check Results / Quality Gate') {
+    steps {
+        withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
+            script {
+                // Capture scan ID from previous stage (scan create output)
+                def scanOutput = bat(
+                    script: """
                         set CX_APIKEY=%CX_APIKEY%
                         %CX_CLI_PATH% scan create ^
                             --project-name "Rakshhii/Exercises" ^
                             --branch "1.1" ^
                             -s .
-                    """
+                    """,
+                    returnStdout: true
+                ).trim()
+
+                // Extract Scan ID using regex
+                def scanIdMatch = scanOutput =~ /Scan ID\s*:\s*([a-f0-9-]+)/
+                if (!scanIdMatch) {
+                    error("❌ Failed to extract Scan ID.")
+                }
+
+                def scanId = scanIdMatch[0][1]
+                echo "🔍 Extracted Scan ID: ${scanId}"
+
+                // Run results show
+                def resultJson = bat(
+                    script: """
+                        set CX_APIKEY=%CX_APIKEY%
+                        %CX_CLI_PATH% results show --scan-id ${scanId} --format json
+                    """,
+                    returnStdout: true
+                ).trim()
+
+                echo "Scan Results (JSON): ${resultJson}"
+
+                // Check for "HIGH" severity vulnerabilities
+                if (resultJson.contains('"HIGH"') || resultJson.contains('"CRITICAL"')) {
+                    error("❌ High or Critical severity vulnerabilities found! Failing the pipeline.")
+                } else {
+                    echo "✅ No high or critical severity vulnerabilities detected."
                 }
             }
-        }
-
-        stage('Check Results / Quality Gate') {
-            steps {
-                withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
-                    script {
-                        def result = bat(script: """
-                            set CX_APIKEY=%CX_APIKEY%
-                            %CX_CLI_PATH% results show --last --format json
-                        """, returnStdout: true).trim()
-
-                        echo "Scan Results: ${result}"
-
-                        if (result.contains('"HIGH"')) {
-                            error("❌ High severity vulnerabilities found! Failing the pipeline.")
-                        } else {
-                            echo "✅ No high severity vulnerabilities detected. Pipeline passes."
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "Pipeline finished. Cleaning up workspace..."
-            cleanWs()
         }
     }
 }
