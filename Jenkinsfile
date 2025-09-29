@@ -24,7 +24,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'cx-api-key', variable: 'CX_APIKEY')]) {
                     bat """
                         echo Configuring CxOne CLI...
-                        ${env.CX_CLI_PATH} configure set --prop-name cx_base_uri --prop-value https://ind.ast.checkmarx.net
+                        ${env.CX_CLI_PATH} configure set --prop-name cx_base_uri --prop-value https://localhost:8080
                         ${env.CX_CLI_PATH} configure set --prop-name cx_tenant --prop-value cx_ind_internal_test
                         echo API key will be passed via environment variable.
                     """
